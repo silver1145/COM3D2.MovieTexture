@@ -41,7 +41,7 @@ jobs:
           cp -r "Resources/*" "./${release_name}/config/MovieTexture"
 
           # Pack
-          7z a -tzip "${release_name}.zip" --output "./${release_name}/*"
+          7z a -tzip "COM3D2.MovieTexture.Plugin.zip" --output "./${release_name}/*"
 
           # Delete output directory
           rm -r "$release_name"
