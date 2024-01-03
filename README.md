@@ -47,4 +47,6 @@ echo "Finished."
 pause>nul
 ```
 
-* Note: You can add a video as RenderTexture to any Texture Slot. This means that some special dynamic effects can be achieved, such as replacing `_MatcapMap` map to implement transition transformations in different MatCaps, or replacing `_NormalMap`/`_ParallaxShaderToggle` map to achieve normal/parallax animation.
+* You can add a video as RenderTexture to any Texture Slot. This means that some special dynamic effects can be achieved, such as replacing `_MatcapMap` map to implement transition transformations in different MatCaps, or replacing `_NormalMap`/`_ParallaxShaderToggle` map to achieve normal/parallax animation.
+* If `COM3D2.MaidLoader` is installed, the refresh function of MaidLoader will reload all *.mp4
+* Use [dcm_sync_anm](https://github.com/silver1145/scripts-com3d2#dcm_sync_anm) to sync video with `COM3D2.DanceCameraMotion.Plugin`.
