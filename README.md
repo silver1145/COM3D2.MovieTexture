@@ -5,7 +5,8 @@ For the original texture, just place the video file with the same name in the di
 
 ## Install
 
-Download [from Release](https://github.com/silver1145/COM3D2.MovieTexture/releases) and Extract `config` & `plugins` to `BepinEx/`
+Download from [Release](https://github.com/silver1145/COM3D2.MovieTexture/releases) and Extract `config` & `plugins` to `BepinEx/`
+
 **Dependencies**:
 
 * COM3D2.NPRShader.Plugin [Sybaris Version]
