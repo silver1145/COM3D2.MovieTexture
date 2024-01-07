@@ -24,13 +24,15 @@ namespace COM3D2.MovieTexture.Plugin
     public sealed class MovieTexture : BaseUnityPlugin
     {
         public static MovieTexture Instance { get; private set; }
+        public static Harmony harmony { get; private set; }
         internal static new ManualLogSource Logger => Instance?._Logger;
         private ManualLogSource _Logger => base.Logger;
 
         private void Awake()
         {
             Instance = this;
-            Harmony.CreateAndPatchAll(typeof(MovieTexturePatcher));
+            harmony = Harmony.CreateAndPatchAll(typeof(MovieTexturePatcher));
+            MovieTexturePatcher.DoTryPatch();
             CreatePluginObject();
         }
 

@@ -13,6 +13,7 @@ namespace COM3D2.MovieTexture.Plugin
         public static Dictionary<string, string> TextureNames;
         public static Dictionary<string, RenderTexture> RenderTextures;
         public static HashSet<string> tempPropNames;
+        static bool patched = false;
 
         public static void Reload()
         {
@@ -240,6 +241,41 @@ namespace COM3D2.MovieTexture.Plugin
         public static IEnumerable<CodeInstruction> SceneCaptureLoadMeshTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             return ProcessTranspiler(instructions);
+        }
+
+        public static void DoTryPatch()
+        {
+            TryPatch();
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += SceneLoaded;
+        }
+
+        private static void TryPatch()
+        {
+            try
+            {
+                var mOriginal = AccessTools.Method(AccessTools.TypeByName("COM3D2.MaidLoader.RefreshMod"), "RefreshCo");
+                var mPrefix = SymbolExtensions.GetMethodInfo(() => RefreshCoPrefix());
+                MovieTexture.harmony.Patch(mOriginal, new HarmonyMethod(mPrefix));
+                patched = true;
+                UnityEngine.SceneManagement.SceneManager.sceneLoaded -= SceneLoaded;
+            }
+            finally
+            {
+            }
+        }
+
+        private static void SceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode loadSceneMode)
+        {
+            if (!patched)
+            {
+                patched = true;
+                TryPatch();
+            }
+        }
+
+        public static void RefreshCoPrefix()
+        {
+            ReloadTextureFiles();
         }
     }
 }
