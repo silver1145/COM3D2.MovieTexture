@@ -88,6 +88,7 @@
   <ItemGroup>
     <Compile Include="MovieTextureManager.cs" />
     <Compile Include="MovieTexturePatcher.cs" />
+    <Compile Include="PlayerSettingPatcher.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="MovieTexture.cs" />
     <Compile Include="ResolveToRenderTexture.cs" />
