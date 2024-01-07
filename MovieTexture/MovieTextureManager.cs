@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using RenderHeads.Media.AVProVideo;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -25,6 +26,25 @@ namespace COM3D2.MovieTexture.Plugin
             UnityEngine.SceneManagement.SceneManager.sceneLoaded += SceneLoaded;
         }
 
+        public static void SetPlatformOptions(MediaPlayer.OptionsWindows platformOptionsWindows)
+        {
+            string videoAPI = GameMain.Instance.CMSystem.SConfig.VideoAPI;
+            if (!string.IsNullOrEmpty(videoAPI))
+            {
+                try
+                {
+                    platformOptionsWindows.videoApi = (Windows.VideoApi)Enum.Parse(typeof(Windows.VideoApi), videoAPI, true);
+                }
+                finally { }
+            }
+            string dshowFilter = GameMain.Instance.CMSystem.SConfig.DShowFilter;
+            if (!string.IsNullOrEmpty(dshowFilter))
+            {
+                platformOptionsWindows.preferredFilters.Add(dshowFilter);
+            }
+            platformOptionsWindows.useHardwareDecoding = GameMain.Instance.CMSystem.SConfig.VideoUseHardwareDecoding;
+        }
+
         public static MediaPlayer GetMediaPlayer(string filename)
         {
             if (mediaPlayers.TryGetValue(filename, out var player))
@@ -34,7 +54,8 @@ namespace COM3D2.MovieTexture.Plugin
             var mPlayer = mediaPlayerManager.AddComponent<MediaPlayer>();
             mPlayer.m_WrapMode = TextureWrapMode.Repeat;
             mPlayer.m_Loop = true;
-            // mPlayer.m_Muted = true;
+            MediaPlayer.OptionsWindows platformOptionsWindows = mPlayer.PlatformOptionsWindows;
+            SetPlatformOptions(platformOptionsWindows);
             if (filename.ToLower().EndsWith(".alphapack.mp4"))
             {
                 mPlayer.m_AlphaPacking = AlphaPacking.TopBottom;
