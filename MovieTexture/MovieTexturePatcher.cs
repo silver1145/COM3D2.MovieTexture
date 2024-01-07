@@ -69,7 +69,7 @@ namespace COM3D2.MovieTexture.Plugin
             }
             if (value != null)
             {
-                string texName = value.name;
+                string texName = value.name?.ToLower();
                 if (TextureNames.TryGetValue(texName, out var path))
                 {
                     if (RenderTextures.TryGetValue(texName, out var tex))

@@ -36,9 +36,8 @@ namespace COM3D2.MovieTexture.Plugin
 
         void CreatePluginObject()
         {
-            GameObject obj = new GameObject("COM3D2.MovieTexture");
+            GameObject obj = new GameObject("COM3D2.MovieTexture.Plugin");
             MovieTextureManager.InitmediaPlayerManager(obj);
-            obj.AddComponent<MovieTextureManager>();
             DontDestroyOnLoad(obj);
         }
     }

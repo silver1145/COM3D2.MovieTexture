@@ -1,23 +1,28 @@
-﻿using RenderHeads.Media.AVProVideo;
+﻿using HarmonyLib;
+using RenderHeads.Media.AVProVideo;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 namespace COM3D2.MovieTexture.Plugin
 {
-    class MovieTextureManager : MonoBehaviour
+    internal class MovieTextureManager : MonoBehaviour
     {
+        public static MovieTextureManager Instance { get; private set; }
         public static Dictionary<string, MediaPlayer> mediaPlayers = new Dictionary<string, MediaPlayer>();
         public static Dictionary<string, List<ResolveToRenderTexture>> resolvers = new Dictionary<string, List<ResolveToRenderTexture>>();
         public static GameObject mediaPlayerManager;
+        public static MethodInfo OpenVideoFromFile = AccessTools.Method(typeof(MediaPlayer), "OpenVideoFromFile", [] );
         public static bool checkFlag = false;
         public static bool tempCheckFlag = false;
 
         public static void InitmediaPlayerManager(GameObject obj)
         {
-            mediaPlayerManager = new GameObject("COM3D2.MovieTexture.MediaPlayerManager");
+            mediaPlayerManager = new GameObject("COM3D2.MovieTexture.Plugin.MediaPlayerManager");
             mediaPlayerManager.transform.parent = obj.transform;
+            Instance = obj.AddComponent<MovieTextureManager>();
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += SceneLoaded;
         }
 
         public static MediaPlayer GetMediaPlayer(string filename)
@@ -26,19 +31,17 @@ namespace COM3D2.MovieTexture.Plugin
             {
                 return player;
             }
-            var avPlayer = mediaPlayerManager.AddComponent<MediaPlayer>();
-            avPlayer.name = Path.GetFileNameWithoutExtension(filename).ToLower();
-            avPlayer.m_WrapMode = TextureWrapMode.Repeat;
+            var mPlayer = mediaPlayerManager.AddComponent<MediaPlayer>();
+            mPlayer.m_WrapMode = TextureWrapMode.Repeat;
+            mPlayer.m_Loop = true;
+            // mPlayer.m_Muted = true;
             if (filename.ToLower().EndsWith(".alphapack.mp4"))
             {
-                avPlayer.m_AlphaPacking = AlphaPacking.TopBottom;
+                mPlayer.m_AlphaPacking = AlphaPacking.TopBottom;
             }
-            avPlayer.m_Loop = true;
-            avPlayer.OpenVideoFromFile(MediaPlayer.FileLocation.AbsolutePathOrURL, filename, true);
-            avPlayer.m_Muted = true;
-            // avPlayer.Start();
-            mediaPlayers[filename] = avPlayer;
-            return avPlayer;
+            mPlayer.OpenVideoFromFile(MediaPlayer.FileLocation.AbsolutePathOrURL, filename, true);
+            mediaPlayers[filename] = mPlayer;
+            return mPlayer;
         }
 
         public static void AddResolver(Renderer renderer, string filename, RenderTexture renderTexture)
@@ -95,6 +98,14 @@ namespace COM3D2.MovieTexture.Plugin
                 resolvers.Remove(key);
                 mediaPlayers.Remove(key);
             }
+            foreach (var mplayer in mediaPlayers.Values)
+            {
+                if (((BaseMediaPlayer)mplayer.m_Player).GetVideoDisplayRate() == 0)
+                {
+                    MovieTexture.Logger.LogInfo("Incorrect MediaPlayer, Reopen.");
+                    OpenVideoFromFile?.Invoke(mplayer, null);
+                }
+            }
         }
 
         public static void SetCheckFlag()
@@ -108,6 +119,17 @@ namespace COM3D2.MovieTexture.Plugin
             {
                 mplayer.Control.Seek(0);
             }
+        }
+
+        private static void SceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode loadSceneMode)
+        {
+            Instance.StartCoroutine(SceneLoadedCheck());
+        }
+
+        private static System.Collections.IEnumerator SceneLoadedCheck()
+        {
+            yield return new WaitForSeconds(1f);
+            SetCheckFlag();
         }
 
         void LateUpdate()
