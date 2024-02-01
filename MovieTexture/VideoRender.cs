@@ -84,15 +84,15 @@ namespace RenderHeads.Media.AVProVideo
         public static readonly LazyShaderProperty PropBrightness = new LazyShaderProperty("_Brightness");
         public static readonly LazyShaderProperty PropInvGamma = new LazyShaderProperty("_InvGamma");
 
-        public static AssetBundle asset = AssetBundle.LoadFromFile("BepinEx/config/MovieTexture/resolveshader");
         public static Shader shader; 
 
         public static Material CreateResolveMaterial()
         {
             if (shader is null)
             {
-                Shader s = asset.LoadAsset("assets/shaders/resources/avprovideo-internal-resolve.shader", typeof(Shader)) as Shader;
-                shader = s;
+                AssetBundle asset = AssetBundle.LoadFromFile("BepinEx/config/MovieTexture/resolveshader");
+                shader = asset.LoadAsset("assets/shaders/resources/avprovideo-internal-resolve.shader", typeof(Shader)) as Shader;
+                asset.Unload(false);
             }
             return new Material(shader);
         }

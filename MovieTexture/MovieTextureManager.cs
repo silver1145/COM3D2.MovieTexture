@@ -14,6 +14,7 @@ namespace COM3D2.MovieTexture.Plugin
         public static Dictionary<string, MediaPlayer> mediaPlayers = new Dictionary<string, MediaPlayer>();
         public static Dictionary<string, List<ResolveToRenderTexture>> resolvers = new Dictionary<string, List<ResolveToRenderTexture>>();
         public static GameObject mediaPlayerManager;
+        public static GameObject resolverManager;
         public static MethodInfo OpenVideoFromFile = AccessTools.Method(typeof(MediaPlayer), "OpenVideoFromFile", [] );
         public static bool checkFlag = false;
         public static bool tempCheckFlag = false;
@@ -22,6 +23,8 @@ namespace COM3D2.MovieTexture.Plugin
         {
             mediaPlayerManager = new GameObject("COM3D2.MovieTexture.Plugin.MediaPlayerManager");
             mediaPlayerManager.transform.parent = obj.transform;
+            resolverManager = new GameObject("COM3D2.MovieTexture.Plugin.ResolverManager");
+            resolverManager.transform.parent = obj.transform;
             Instance = obj.AddComponent<MovieTextureManager>();
             UnityEngine.SceneManagement.SceneManager.sceneLoaded += SceneLoaded;
         }
@@ -65,10 +68,14 @@ namespace COM3D2.MovieTexture.Plugin
             return mPlayer;
         }
 
-        public static void AddResolver(Renderer renderer, string filename, RenderTexture renderTexture)
+        public static ResolveToRenderTexture AddResolver(string filename, RenderTexture renderTexture, GameObject gameObject = null)
         {
             var player = GetMediaPlayer(filename);
-            var resolveToTexture = renderer.gameObject.AddComponent<ResolveToRenderTexture>();
+            if (gameObject == null)
+            {
+                gameObject = resolverManager;
+            }
+            var resolveToTexture = gameObject.AddComponent<ResolveToRenderTexture>();
             resolveToTexture.MediaPlayer = player;
             resolveToTexture.ExternalTexture = renderTexture;
             resolveToTexture.OnDestroyEvnt += SetCheckFlag;
@@ -81,6 +88,7 @@ namespace COM3D2.MovieTexture.Plugin
                 resolveToTexture.enabled = false;
             }
             resolvers[filename].Add(resolveToTexture);
+            return resolveToTexture;
         }
 
         public static void CheckResolvers()
@@ -121,7 +129,7 @@ namespace COM3D2.MovieTexture.Plugin
             }
             foreach (var mplayer in mediaPlayers.Values)
             {
-                if (((BaseMediaPlayer)mplayer.m_Player).GetVideoDisplayRate() == 0)
+                if (((BaseMediaPlayer)mplayer.Player).GetVideoDisplayRate() == 0)
                 {
                     MovieTexture.Logger.LogInfo("Incorrect MediaPlayer, Reopen.");
                     OpenVideoFromFile?.Invoke(mplayer, null);

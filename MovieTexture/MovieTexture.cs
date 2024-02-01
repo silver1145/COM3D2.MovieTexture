@@ -44,7 +44,7 @@ namespace COM3D2.MovieTexture.Plugin
             Instance = this;
             harmony = Harmony.CreateAndPatchAll(typeof(MovieTexturePatcher));
             harmony.PatchAll(typeof(PlayerSettingPatcher));
-            MovieTexturePatcher.DoTryPatch();
+            MovieTexturePatcher.DoTryPatch(harmony);
             CreatePluginObject();
         }
 

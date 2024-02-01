@@ -3,6 +3,7 @@ using RenderHeads.Media.AVProVideo;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Emit;
 using UnityEngine;
 
@@ -10,17 +11,16 @@ namespace COM3D2.MovieTexture.Plugin
 {
     internal static class MovieTexturePatcher
     {
-        public static Dictionary<string, string> TextureNames;
-        public static Dictionary<string, RenderTexture> RenderTextures;
+        public static Dictionary<string, string> textureNames;
+        public static Dictionary<string, RenderTexture> renderTextures;
         public static HashSet<string> tempPropNames;
-        static bool patched = false;
 
         public static void Reload()
         {
             
-            if (RenderTextures == null)
+            if (renderTextures == null)
             {
-                RenderTextures = new Dictionary<string, RenderTexture>();
+                renderTextures = new Dictionary<string, RenderTexture>();
             }
             if (tempPropNames == null)
             {
@@ -32,13 +32,13 @@ namespace COM3D2.MovieTexture.Plugin
 
         public static void ReloadTextureFiles()
         {
-            if (TextureNames == null)
+            if (textureNames == null)
             {
-                TextureNames = new Dictionary<string, string>();
+                textureNames = new Dictionary<string, string>();
             }
             else
             {
-                TextureNames.Clear();
+                textureNames.Clear();
             }
             List<string> alphaPackFiles = new List<string>();
             var Files = Directory.GetFiles(BepInEx.Paths.GameRootPath + "\\Mod", "*.mp4", SearchOption.AllDirectories);
@@ -51,29 +51,29 @@ namespace COM3D2.MovieTexture.Plugin
                 }
                 else
                 {
-                    TextureNames[Path.GetFileNameWithoutExtension(fileName)] = fileName;
+                    textureNames[Path.GetFileNameWithoutExtension(fileName)] = fileName;
                 }
             }
             foreach (string afile in alphaPackFiles)
             {
                 string name = Path.GetFileNameWithoutExtension(afile);
                 name = name.Substring(0, name.LastIndexOf(".alphapack"));
-                TextureNames[name] = afile;
+                textureNames[name] = afile;
             }
         }
 
         public static void SetTexture(Material m, string name, Texture value)
         {
-            if (RenderTextures == null)
+            if (renderTextures == null)
             {
                 Reload();
             }
             if (value != null)
             {
                 string texName = value.name?.ToLower();
-                if (TextureNames.TryGetValue(texName, out var path))
+                if (textureNames.TryGetValue(texName, out var path))
                 {
-                    if (RenderTextures.TryGetValue(texName, out var tex))
+                    if (renderTextures.TryGetValue(texName, out var tex))
                     {
                         value = tex;
                     }
@@ -83,7 +83,7 @@ namespace COM3D2.MovieTexture.Plugin
                         tex2.name = texName;
                         tex2.wrapMode = TextureWrapMode.Repeat;
                         // tex2.antiAliasing = 8;
-                        RenderTextures[texName] = tex2;
+                        renderTextures[texName] = tex2;
                         value = tex2;
                     }
                     tempPropNames.Add(name);
@@ -94,7 +94,7 @@ namespace COM3D2.MovieTexture.Plugin
 
         public static void ProcessRenderer(Renderer renderer)
         {
-            if (RenderTextures == null)
+            if (renderTextures == null)
             {
                 Reload();
             }
@@ -108,7 +108,7 @@ namespace COM3D2.MovieTexture.Plugin
                         {
                             if (m.GetTexture(prop) is RenderTexture rt)
                             {
-                                if (rt != null && RenderTextures.TryGetValue(rt.name, out var tex) && tex == rt && TextureNames.TryGetValue(rt.name, out var path))
+                                if (rt != null && renderTextures.TryGetValue(rt.name, out var tex) && tex == rt && textureNames.TryGetValue(rt.name, out var path))
                                 {
                                     bool flag = true;
                                     foreach (var component in renderer.GetComponents<ResolveToRenderTexture>())
@@ -121,7 +121,7 @@ namespace COM3D2.MovieTexture.Plugin
                                     }
                                     if (flag)
                                     {
-                                        MovieTextureManager.AddResolver(renderer, path, tex);
+                                        MovieTextureManager.AddResolver(path, tex, renderer.gameObject);
                                     }
                                 }
                             }
@@ -132,53 +132,17 @@ namespace COM3D2.MovieTexture.Plugin
             tempPropNames.Clear();
         }
 
-        public static IEnumerable<CodeInstruction> ReadMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
+        public static void DoTryPatch(Harmony harmony)
         {
-            CodeMatcher codeMatcher = new CodeMatcher(instructions);
-            codeMatcher.End()
-                .MatchBack(false, [new CodeMatch(OpCodes.Callvirt, AccessTools.Method(typeof(Material), "SetTexture", [typeof(string), typeof(Texture)]))])
-                .SetInstruction(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MovieTexturePatcher), nameof(SetTexture))));
-            return codeMatcher.InstructionEnumeration();
+            new TryPatchNPRShader(harmony);
+            new TryPatchSceneCapture(harmony);
+            new TryPatchDanceCameraMotion(harmony);
+            new TryPatchMaidLoader(harmony);
         }
 
-        [HarmonyPatch(typeof(ImportCM), "ReadMaterial")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> ImportCMReadMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
+        public static void RefreshCoPrefix()
         {
-            return ReadMaterialTranspiler(instructions);
-        }
-
-        [HarmonyPatch(typeof(COM3D2.NPRShader.Plugin.NPRShader), "ReadMaterial")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> NPRShaderReadMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            return ReadMaterialTranspiler(instructions);
-        }
-
-        [HarmonyPatch(typeof(COM3D2.NPRShader.Plugin.AssetLoader), "ReadMaterialWithSetShader")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> NPRShaderReadMaterialWithSetShaderTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            return ReadMaterialTranspiler(instructions);
-        }
-
-        [HarmonyPatch(typeof(CM3D2.SceneCapture.Plugin.AssetLoader), "ReadMaterial")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> SceneCaptureReadMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            return ReadMaterialTranspiler(instructions);
-        }
-
-        // Process Renderer
-        public static IEnumerable<CodeInstruction> ProcessTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            CodeMatcher codeMatcher = new CodeMatcher(instructions);
-            codeMatcher.End()
-                .MatchBack(false, [new CodeMatch(OpCodes.Callvirt, AccessTools.PropertySetter(typeof(Renderer), "materials"))])
-                .Advance(1)
-                .InsertAndAdvance(codeMatcher.InstructionAt(-3))
-                .InsertAndAdvance(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MovieTexturePatcher), nameof(ProcessRenderer))));
-            return codeMatcher.InstructionEnumeration();
+            ReloadTextureFiles();
         }
 
         public static IEnumerable<CodeInstruction> FixLeaveTranspiler(IEnumerable<CodeInstruction> instructions)
@@ -187,20 +151,47 @@ namespace COM3D2.MovieTexture.Plugin
             codeMatcher.Start();
             while (codeMatcher.IsValid)
             {
-                codeMatcher.MatchForward(false, [new CodeMatch(OpCodes.Leave)])
+                codeMatcher.MatchForward(false, new CodeMatch(OpCodes.Leave))
                     .Advance(1)
                     .InsertAndAdvance(new CodeInstruction(OpCodes.Nop));
             }
             return codeMatcher.InstructionEnumeration();
         }
 
-        [HarmonyPatch(typeof(TBody), "ChangeMaterial")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> TBodyChangeMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
+        public static IEnumerable<CodeInstruction> ProcessReadMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             CodeMatcher codeMatcher = new CodeMatcher(instructions);
             codeMatcher.End()
-                .MatchBack(false, [new CodeMatch(OpCodes.Ldc_I4_1)])
+                .MatchBack(false, new CodeMatch(OpCodes.Callvirt, AccessTools.Method(typeof(Material), "SetTexture", [typeof(string), typeof(Texture)])))
+                .SetInstruction(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MovieTexturePatcher), nameof(SetTexture))));
+            return codeMatcher.InstructionEnumeration();
+        }
+
+        [HarmonyPatch(typeof(ImportCM), "ReadMaterial")]
+        [HarmonyTranspiler]
+        internal static IEnumerable<CodeInstruction> ReadMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            return ProcessReadMaterialTranspiler(instructions);
+        }
+
+        public static IEnumerable<CodeInstruction> ProcessMeshTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            CodeMatcher codeMatcher = new CodeMatcher(instructions);
+            codeMatcher.End()
+                .MatchBack(false, new CodeMatch(OpCodes.Callvirt, AccessTools.PropertySetter(typeof(Renderer), "materials")))
+                .Advance(1)
+                .InsertAndAdvance(codeMatcher.InstructionAt(-3))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MovieTexturePatcher), nameof(ProcessRenderer))));
+            return codeMatcher.InstructionEnumeration();
+        }
+
+        [HarmonyPatch(typeof(TBody), "ChangeMaterial")]
+        [HarmonyTranspiler]
+        internal static IEnumerable<CodeInstruction> TBodyChangeMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            CodeMatcher codeMatcher = new CodeMatcher(instructions);
+            codeMatcher.End()
+                .MatchBack(false, new CodeMatch(OpCodes.Ldc_I4_1))
                 .Advance(-1)
                 .InsertAndAdvance(new CodeInstruction(OpCodes.Ldloc_S, 6))
                 .InsertAndAdvance(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MovieTexturePatcher), nameof(ProcessRenderer))));
@@ -209,73 +200,337 @@ namespace COM3D2.MovieTexture.Plugin
 
         [HarmonyPatch(typeof(ImportCM), "LoadSkinMesh_R")]
         [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> ImportCMLoadSkinMeshRTranspiler(IEnumerable<CodeInstruction> instructions)
+        internal static IEnumerable<CodeInstruction> ImportCMLoadSkinMeshRTranspiler(IEnumerable<CodeInstruction> instructions)
         {
-            return ProcessTranspiler(instructions);
+            return ProcessMeshTranspiler(instructions);
+        }
+    }
+
+    internal class TryPatchNPRShader : TryPatch
+    {
+        public TryPatchNPRShader(Harmony harmony, int failLimit = 1) : base(harmony, failLimit) { }
+
+        public override bool Patch()
+        {
+            if (AccessTools.TypeByName("COM3D2.NPRShader.Plugin.NPRShader") == null)
+            {
+                return false;
+            }
+            var readMaterial = AccessTools.Method(AccessTools.TypeByName("COM3D2.NPRShader.Plugin.NPRShader"), "ReadMaterial");
+            var readMaterialTranspiler = AccessTools.Method(typeof(TryPatchNPRShader), nameof(ReadMaterialTranspiler));
+            harmony.Patch(readMaterial, transpiler: new HarmonyMethod(readMaterialTranspiler));
+            var readMaterialWithSetShader = AccessTools.Method(AccessTools.TypeByName("COM3D2.NPRShader.Plugin.AssetLoader"), "ReadMaterialWithSetShader");
+            var readMaterialWithSetShaderTranspiler = AccessTools.Method(typeof(TryPatchNPRShader), nameof(ReadMaterialWithSetShaderTranspiler));
+            harmony.Patch(readMaterialWithSetShader, transpiler: new HarmonyMethod(readMaterialWithSetShaderTranspiler));
+            var changeNPRSMaterial = AccessTools.Method(AccessTools.TypeByName("COM3D2.NPRShader.Managed.NPRShaderManaged"), "ChangeNPRSMaterial");
+            var changeNPRSMaterialTranspiler = AccessTools.Method(typeof(TryPatchNPRShader), nameof(ChangeNPRSMaterialTranspiler));
+            harmony.Patch(changeNPRSMaterial, transpiler: new HarmonyMethod(changeNPRSMaterialTranspiler));
+            var updaateMaterial = AccessTools.Method(AccessTools.TypeByName("COM3D2.NPRShader.Plugin.ObjectWindow"), "UpdaateMaterial");
+            var updaateMaterialTranspiler = AccessTools.Method(typeof(TryPatchNPRShader), nameof(UpdaateMaterialTranspiler));
+            harmony.Patch(updaateMaterial, transpiler: new HarmonyMethod(updaateMaterialTranspiler));
+            return true;
         }
 
-        [HarmonyPatch(typeof(COM3D2.NPRShader.Managed.NPRShaderManaged), "ChangeNPRSMaterial")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> NPRShaderManagedChangeNPRSMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
+        internal static IEnumerable<CodeInstruction> ReadMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
         {
-            return ProcessTranspiler(instructions);
+            return MovieTexturePatcher.ProcessReadMaterialTranspiler(instructions);
+        }
+
+        internal static IEnumerable<CodeInstruction> ReadMaterialWithSetShaderTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            return MovieTexturePatcher.ProcessReadMaterialTranspiler(instructions);
+        }
+
+        internal static IEnumerable<CodeInstruction> ChangeNPRSMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            return MovieTexturePatcher.ProcessMeshTranspiler(instructions);
         }
 
         // Note: Leave Label
-        [HarmonyPatch(typeof(COM3D2.NPRShader.Plugin.ObjectWindow), "UpdaateMaterial")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> NPRShaderObjectWindowUpdaateMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
+        internal static IEnumerable<CodeInstruction> UpdaateMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
         {
-            return FixLeaveTranspiler(ProcessTranspiler(instructions));
+            return MovieTexturePatcher.FixLeaveTranspiler(MovieTexturePatcher.ProcessMeshTranspiler(instructions));
         }
+    }
 
-        [HarmonyPatch(typeof(CM3D2.SceneCapture.Plugin.ModelWindow), "LoadModel")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> SceneCaptureModelWindowLoadModelTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            return ProcessTranspiler(instructions);
-        }
+    internal class TryPatchSceneCapture : TryPatch
+    {
+        public TryPatchSceneCapture(Harmony harmony, int failLimit = 1) : base(harmony, failLimit) { }
 
-        [HarmonyPatch(typeof(CM3D2.SceneCapture.Plugin.AssetLoader), "LoadMesh")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> SceneCaptureLoadMeshTranspiler(IEnumerable<CodeInstruction> instructions)
+        public override bool Patch()
         {
-            return ProcessTranspiler(instructions);
-        }
-
-        public static void DoTryPatch()
-        {
-            TryPatch();
-            UnityEngine.SceneManagement.SceneManager.sceneLoaded += SceneLoaded;
-        }
-
-        private static void TryPatch()
-        {
-            try
+            if (AccessTools.TypeByName("CM3D2.SceneCapture.Plugin.SceneCapture") == null)
             {
-                var mOriginal = AccessTools.Method(AccessTools.TypeByName("COM3D2.MaidLoader.RefreshMod"), "RefreshCo");
-                var mPrefix = SymbolExtensions.GetMethodInfo(() => RefreshCoPrefix());
-                MovieTexture.harmony.Patch(mOriginal, new HarmonyMethod(mPrefix));
-                patched = true;
-                UnityEngine.SceneManagement.SceneManager.sceneLoaded -= SceneLoaded;
+                return false;
             }
-            finally
+            var readMaterial = AccessTools.Method(AccessTools.TypeByName("CM3D2.SceneCapture.Plugin.AssetLoader"), "ReadMaterial");
+            var readMaterialTranspiler = AccessTools.Method(typeof(TryPatchSceneCapture), nameof(ReadMaterialTranspiler));
+            harmony.Patch(readMaterial, transpiler: new HarmonyMethod(readMaterialTranspiler));
+            var loadModel = AccessTools.Method(AccessTools.TypeByName("CM3D2.SceneCapture.Plugin.ModelWindow"), "LoadModel");
+            var loadModelTranspiler = AccessTools.Method(typeof(TryPatchSceneCapture), nameof(LoadModelTranspiler));
+            harmony.Patch(loadModel, transpiler: new HarmonyMethod(loadModelTranspiler));
+            var loadMesh = AccessTools.Method(AccessTools.TypeByName("CM3D2.SceneCapture.Plugin.AssetLoader"), "LoadMesh");
+            var loadMeshTranspiler = AccessTools.Method(typeof(TryPatchSceneCapture), nameof(LoadMeshTranspiler));
+            harmony.Patch(loadMesh, transpiler: new HarmonyMethod(loadMeshTranspiler));
+            return true;
+        }
+
+        internal static IEnumerable<CodeInstruction> ReadMaterialTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            return MovieTexturePatcher.ProcessReadMaterialTranspiler(instructions);
+        }
+
+        internal static IEnumerable<CodeInstruction> LoadModelTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            return MovieTexturePatcher.ProcessMeshTranspiler(instructions);
+        }
+
+        internal static IEnumerable<CodeInstruction> LoadMeshTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            return MovieTexturePatcher.ProcessMeshTranspiler(instructions);
+        }
+    }
+
+    internal class TryPatchDanceCameraMotion : TryPatch
+    {
+        public static Dictionary<ScreenOverlay, ResolveToRenderTexture> screenOverlayResolvers;
+        public static Dictionary<ScreenOverlay, string> screenOverlayFileNames;
+        public static Dictionary<string, RenderTexture> dcmRenderTextures;
+        private static FieldInfo overlayMaterial;
+        public static AssetBundle asset;
+        public static Shader shader;
+
+        public TryPatchDanceCameraMotion(Harmony harmony, int failLimit = 1) : base(harmony, failLimit) { }
+
+        public override bool Patch()
+        {
+            if (AccessTools.TypeByName("COM3D2.DanceCameraMotion.Plugin.DanceCameraMotion") == null)
             {
+                return false;
+            }
+            var setScreenOverlayTexture = AccessTools.Method(AccessTools.TypeByName("COM3D2.DanceCameraMotion.Plugin.ImageEffectsManager"), "SetScreenOverlayTexture");
+            var setScreenOverlayTextureTranspiler = AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(SetScreenOverlayTextureTranspiler));
+            harmony.Patch(setScreenOverlayTexture, transpiler: new HarmonyMethod(setScreenOverlayTextureTranspiler));
+            var setLookAtCameraComponent = AccessTools.Method(AccessTools.TypeByName("COM3D2.DanceCameraMotion.Plugin.ImageEffectsManager"), "SetLookAtCameraComponent");
+            var setLookAtCameraComponentTranspiler = AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(SetLookAtCameraComponentTranspiler));
+            harmony.Patch(setLookAtCameraComponent, transpiler: new HarmonyMethod(setLookAtCameraComponentTranspiler));
+            var resetEffectValue = AccessTools.Method(AccessTools.TypeByName("COM3D2.DanceCameraMotion.Plugin.ImageEffectsManager"), "ResetEffectValue");
+            var resetEffectValueTranspiler = AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(ResetEffectValueTranspiler));
+            harmony.Patch(resetEffectValue, transpiler: new HarmonyMethod(resetEffectValueTranspiler));
+            var unenableEffect = AccessTools.Method(AccessTools.TypeByName("COM3D2.DanceCameraMotion.Plugin.ImageEffectsManager"), "UnenableEffect");
+            var unenableEffectTranspiler = AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(UnenableEffectTranspiler));
+            harmony.Patch(unenableEffect, transpiler: new HarmonyMethod(unenableEffectTranspiler));
+            var onRenderImage = AccessTools.Method(typeof(ScreenOverlay), "OnRenderImage");
+            var onRenderImageTranspiler = AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(OnRenderImageTranspiler));
+            harmony.Patch(onRenderImage, transpiler: new HarmonyMethod(onRenderImageTranspiler));
+            var getPngFile = AccessTools.Method(AccessTools.TypeByName("COM3D2.DanceCameraMotion.Plugin.FileReader"), "GetPngFile");
+            var getPngFileTranspiler = AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(GetPngFileTranspiler));
+            harmony.Patch(getPngFile, transpiler: new HarmonyMethod(getPngFileTranspiler));
+            var destroyObject = AccessTools.Method(AccessTools.TypeByName("COM3D2.DanceCameraMotion.Plugin.DanceObjectManager"), "DestroyObject");
+            var destroyObjectTranspiler = AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(DestroyObjectTranspiler));
+            harmony.Patch(destroyObject, transpiler: new HarmonyMethod(destroyObjectTranspiler));
+            return true;
+        }
+
+        public static void InitResources()
+        {
+            screenOverlayResolvers = new Dictionary<ScreenOverlay, ResolveToRenderTexture>();
+            screenOverlayFileNames = new Dictionary<ScreenOverlay, string>();
+            dcmRenderTextures = new Dictionary<string, RenderTexture>();
+            asset = AssetBundle.LoadFromFile("BepinEx/config/MovieTexture/spriteshader");
+            shader = asset.LoadAsset("assets/sprite.shader", typeof(Shader)) as Shader;
+            asset.Unload(false);
+            overlayMaterial = AccessTools.Field(typeof(ScreenOverlay), "overlayMaterial");
+        }
+
+        public static RenderTexture GetRenderTexture(string fileName, Texture tex)
+        {
+            if (dcmRenderTextures.TryGetValue(fileName, out RenderTexture renderTexture))
+            {
+                return renderTexture;
+            }
+            RenderTexture tex2 = new RenderTexture(tex.width, tex.height, 24);
+            tex2.name = tex.name;
+            tex2.wrapMode = TextureWrapMode.Repeat;
+            // tex2.antiAliasing = 8;
+            dcmRenderTextures[fileName] = tex2;
+            return tex2;
+        }
+
+        public static void LoadOverLayTexture(ScreenOverlay screenOverlay, string fileName)
+        {
+            if (screenOverlayResolvers == null)
+            {
+                InitResources();
+            }
+            DestroyResolver(screenOverlay);
+            Texture2D texture = screenOverlay.texture;
+            if (texture == null)
+            {
+                return;
+            }
+            string videoFile = Path.ChangeExtension(fileName, ".mp4");
+            string alphaPackFile = Path.ChangeExtension(fileName, ".alphapack.mp4");
+            if (File.Exists(alphaPackFile))
+            {
+                videoFile = alphaPackFile;
+            }
+            else if (File.Exists(videoFile)) { }
+            else
+            {
+                return;
+            }
+            RenderTexture renderTexture = GetRenderTexture(videoFile, texture);
+            var resolver = MovieTextureManager.AddResolver(videoFile, renderTexture);
+            screenOverlayResolvers[screenOverlay] = resolver;
+            screenOverlayFileNames[screenOverlay] = videoFile;
+            ((Material)overlayMaterial?.GetValue(screenOverlay))?.SetTexture("_Overlay", renderTexture);
+        }
+
+        public static void CopyOverLayTexture(ScreenOverlay from, ScreenOverlay to)
+        {
+            if (screenOverlayResolvers == null)
+            {
+                InitResources();
+            }
+            if (screenOverlayFileNames.TryGetValue(from, out var fileName) && dcmRenderTextures.TryGetValue(fileName, out var renderTexture))
+            {
+                var resolver = MovieTextureManager.AddResolver(fileName, renderTexture);
+                screenOverlayResolvers[to] = resolver;
+                screenOverlayFileNames[to] = fileName;
+                ((Material)overlayMaterial?.GetValue(to))?.SetTexture("_Overlay", renderTexture);
             }
         }
 
-        private static void SceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode loadSceneMode)
+        public static void DestroyResolver(ScreenOverlay screenOverlay)
         {
-            if (!patched)
+            if (screenOverlayResolvers.TryGetValue(screenOverlay, out var resolver))
             {
-                patched = true;
-                TryPatch();
+                Object.Destroy(resolver);
+                screenOverlayResolvers.Remove(screenOverlay);
             }
+            screenOverlayFileNames.Remove(screenOverlay);
         }
 
-        public static void RefreshCoPrefix()
+        public static bool HasResolver(ScreenOverlay screenOverlay)
         {
-            ReloadTextureFiles();
+            return screenOverlayResolvers != null && screenOverlayResolvers.ContainsKey(screenOverlay);
+        }
+
+        public static void ProcessRenderer2(SpriteRenderer renderer, Texture texture, string fileName, bool isBilinear)
+        {
+            if (screenOverlayResolvers == null)
+            {
+                InitResources();
+            }
+            string videoFile = Path.ChangeExtension(fileName, ".mp4");
+            string alphaPackFile = Path.ChangeExtension(fileName, ".alphapack.mp4");
+            if (File.Exists(alphaPackFile))
+            {
+                videoFile = alphaPackFile;
+            }
+            else if (File.Exists(videoFile)) { }
+            else
+            {
+                return;
+            }
+            RenderTexture renderTexture = GetRenderTexture(videoFile, texture);
+            renderTexture.filterMode = isBilinear ? FilterMode.Bilinear : FilterMode.Point;
+            MovieTextureManager.AddResolver(videoFile, renderTexture, renderer.gameObject);
+            Material mat = new Material(shader);
+            mat.SetTexture("_SubTex", renderTexture);
+            renderer.material = mat;
+        }
+
+        internal static IEnumerable<CodeInstruction> SetScreenOverlayTextureTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            CodeMatcher codeMatcher = new CodeMatcher(instructions);
+            codeMatcher.End()
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Ldloc_0))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Ldloc_2))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(LoadOverLayTexture))));
+            return codeMatcher.InstructionEnumeration();
+        }
+
+        internal static IEnumerable<CodeInstruction> SetLookAtCameraComponentTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            CodeMatcher codeMatcher = new CodeMatcher(instructions);
+            codeMatcher.MatchForward(false, new CodeMatch(OpCodes.Call, AccessTools.Method(AccessTools.TypeByName("COM3D2.DanceCameraMotion.Plugin.ImageEffectsManager"), "CopyValueScreenOverlay")))
+                .Advance(-3)
+                .InsertAndAdvance(codeMatcher.InstructionAt(1))
+                .InsertAndAdvance(codeMatcher.InstructionAt(2))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(CopyOverLayTexture))));
+            return codeMatcher.InstructionEnumeration();
+        }
+
+        internal static IEnumerable<CodeInstruction> ResetEffectValueTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            CodeMatcher codeMatcher = new CodeMatcher(instructions);
+            codeMatcher.MatchForward(false, new CodeMatch(OpCodes.Ldfld, AccessTools.Field(typeof(ScreenOverlay), nameof(ScreenOverlay.texture))))
+                .MatchBack(false, new CodeMatch(OpCodes.Callvirt))
+                .Advance(2)
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Ldloc_2))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(DestroyResolver))));
+            return codeMatcher.InstructionEnumeration();
+        }
+
+        internal static IEnumerable<CodeInstruction> UnenableEffectTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            CodeMatcher codeMatcher = new CodeMatcher(instructions);
+            codeMatcher.MatchForward(false, new CodeMatch(OpCodes.Ldfld, AccessTools.Field(typeof(ScreenOverlay), nameof(ScreenOverlay.texture))))
+                .Advance(-1)
+                .InsertAndAdvance(codeMatcher.Instruction)
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(DestroyResolver))));
+            return codeMatcher.InstructionEnumeration();
+        }
+
+        internal static IEnumerable<CodeInstruction> OnRenderImageTranspiler(IEnumerable<CodeInstruction> instructions, ILGenerator generator)
+        {
+
+            CodeMatcher codeMatcher = new CodeMatcher(instructions, generator);
+            codeMatcher.MatchForward(false, new CodeMatch(OpCodes.Callvirt, AccessTools.Method(typeof(Material), nameof(Material.SetTexture), [typeof(string), typeof(Texture)])))
+                .Advance(1).CreateLabel(out Label label)
+                .Advance(-2).MatchBack(false, new CodeMatch(OpCodes.Callvirt)).Advance(1)
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Ldarg_0))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(HasResolver))))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Brtrue_S, label));
+            return codeMatcher.InstructionEnumeration();
+        }
+
+        internal static IEnumerable<CodeInstruction> GetPngFileTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            CodeMatcher codeMatcher = new CodeMatcher(instructions);
+            codeMatcher.MatchForward(false, new CodeMatch(OpCodes.Callvirt, AccessTools.PropertySetter(typeof(SpriteRenderer), nameof(SpriteRenderer.sprite))))
+                .Advance(1)
+                .InsertAndAdvance(codeMatcher.Instruction)
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Ldloc_S, 4))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Ldloc_S, 3))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Ldarga_S, 2))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(AccessTools.TypeByName("COM3D2.DanceCameraMotion.Plugin.SpriteSet"), "isBilinear")))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(ProcessRenderer2))));
+            return codeMatcher.InstructionEnumeration();
+        }
+
+        internal static IEnumerable<CodeInstruction> DestroyObjectTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            CodeMatcher codeMatcher = new CodeMatcher(instructions);
+            codeMatcher.MatchForward(false, new CodeMatch(OpCodes.Callvirt, AccessTools.PropertyGetter(typeof(Dictionary<string, SpriteRenderer>), "Keys")))
+                .MatchForward(false, new CodeMatch(OpCodes.Call, AccessTools.Method(typeof(Object), nameof(Object.Destroy), [typeof(Object)])))
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Callvirt, AccessTools.PropertyGetter(typeof(Component), nameof(Component.gameObject))));
+            return codeMatcher.InstructionEnumeration();
+        }
+    }
+
+    internal class TryPatchMaidLoader : TryPatch
+    {
+        public TryPatchMaidLoader(Harmony harmony, int failLimit = 3) : base(harmony, failLimit) { }
+
+        public override bool Patch()
+        {
+            var mOriginal = AccessTools.Method(AccessTools.TypeByName("COM3D2.MaidLoader.RefreshMod"), "RefreshCo");
+            var mPrefix = SymbolExtensions.GetMethodInfo(() => MovieTexturePatcher.RefreshCoPrefix());
+            harmony.Patch(mOriginal, prefix: new HarmonyMethod(mPrefix));
+            return true;
         }
     }
 }

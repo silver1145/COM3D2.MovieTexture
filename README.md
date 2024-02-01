@@ -7,12 +7,13 @@ For the original texture, just place the video file with the same name in the di
 
 Download from [Release](https://github.com/silver1145/COM3D2.MovieTexture/releases) and Extract `config` & `plugins` to `BepinEx/`
 
-**Dependencies**:
+**Optional Dependencies**:
 
 * COM3D2.NPRShader.Plugin [Sybaris Version]
 * COM3D2.SceneCapture.Plugin [Sybaris Version]
+* COM3D2.DanceCameraMotion.Plugin [Version>=7.0]
 
-The reason for relying on these plugins is that `COM3D2.MovieTexture.Plugin` implements the replacement of the following textures:
+`COM3D2.MovieTexture.Plugin` implements the replacement of the following textures:
 
 1. Textures in Model/Mate of original game
 2. Textures in Mate of NPRShader
@@ -40,7 +41,7 @@ chcp 65001
 set movFile=%1
 if defined movFile (goto ffmpeg_task) else set /p movFile="Drag in the mov file with a transparent channel and press Enter:"
 :ffmpeg_task
-for %%f in ("%movFile%") do set mp4File=%%~ndpf.alphapack.mp4
+for %%f in (%movFile%) do set mp4File="%%~ndpf.alphapack.mp4"
 ffmpeg -i %movFile% -vf "split [a], pad=iw:ih*2 [b], [a] alphaextract, [b] overlay=0:h" -y %mp4File%
 echo.
 echo "Finished."
