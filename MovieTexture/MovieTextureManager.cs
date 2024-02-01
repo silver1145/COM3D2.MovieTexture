@@ -2,9 +2,13 @@
 using RenderHeads.Media.AVProVideo;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
+using System.Xml;
 using UnityEngine;
+using static OVRLipSync;
 
 namespace COM3D2.MovieTexture.Plugin
 {
@@ -48,6 +52,53 @@ namespace COM3D2.MovieTexture.Plugin
             platformOptionsWindows.useHardwareDecoding = GameMain.Instance.CMSystem.SConfig.VideoUseHardwareDecoding;
         }
 
+        public static void TryReadMediaConfig(MediaPlayer mediaPlayer, string configFileName)
+        {
+
+            bool loop = true;
+            bool muted = false;
+            float volume = 1.0f;
+            float playbackRate = 1.0f;
+            TextureWrapMode wrapMode = TextureWrapMode.Repeat;
+            FilterMode filterMode = FilterMode.Bilinear;
+            int anisoLevel = 1;
+            if (File.Exists(configFileName))
+            {
+                try
+                {
+                    XmlDocument xmlDoc = new XmlDocument();
+                    xmlDoc.Load(configFileName);
+                    XmlNode node = xmlDoc.SelectSingleNode("MediaConfig");
+                    bool.TryParse(node.SelectSingleNode("Loop")?.InnerText, out loop);
+                    bool.TryParse(node.SelectSingleNode("Muted")?.InnerText, out muted);
+                    float.TryParse(node.SelectSingleNode("Volume")?.InnerText, out volume);
+                    float.TryParse(node.SelectSingleNode("PlaybackRate")?.InnerText, out playbackRate);
+                    try
+                    {
+                        wrapMode = (TextureWrapMode)Enum.Parse(typeof(TextureWrapMode), node.SelectSingleNode("WrapMode")?.InnerText);
+                    }
+                    catch { }
+                    try
+                    {
+                        filterMode = (FilterMode)Enum.Parse(typeof(FilterMode), node.SelectSingleNode("FilterMode")?.InnerText);
+                    }
+                    catch { }
+                    int.TryParse(node.SelectSingleNode("AnisoLevel")?.InnerText, out anisoLevel);
+                }
+                catch (Exception e)
+                {
+                    MovieTexture.Logger.LogError(e);
+                }
+            }
+            mediaPlayer.m_Loop = loop;
+            mediaPlayer.m_Muted = muted;
+            mediaPlayer.m_Volume = volume;
+            mediaPlayer.m_PlaybackRate = playbackRate;
+            mediaPlayer.m_WrapMode = wrapMode;
+            mediaPlayer.m_FilterMode = filterMode;
+            mediaPlayer.m_AnisoLevel = anisoLevel;
+        }
+
         public static MediaPlayer GetMediaPlayer(string filename)
         {
             if (mediaPlayers.TryGetValue(filename, out var player))
@@ -55,8 +106,7 @@ namespace COM3D2.MovieTexture.Plugin
                 return player;
             }
             var mPlayer = mediaPlayerManager.AddComponent<MediaPlayer>();
-            mPlayer.m_WrapMode = TextureWrapMode.Repeat;
-            mPlayer.m_Loop = true;
+            TryReadMediaConfig(mPlayer, Path.ChangeExtension(filename, ".xml"));
             MediaPlayer.OptionsWindows platformOptionsWindows = mPlayer.PlatformOptionsWindows;
             SetPlatformOptions(platformOptionsWindows);
             if (filename.ToLower().EndsWith(".alphapack.mp4"))

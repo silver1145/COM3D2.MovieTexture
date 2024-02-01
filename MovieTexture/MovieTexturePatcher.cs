@@ -100,7 +100,7 @@ namespace COM3D2.MovieTexture.Plugin
             }
             if (renderer != null)
             {
-                foreach (var m in renderer.materials)
+                foreach (var m in renderer.sharedMaterials)
                 {
                     if (m != null)
                     {

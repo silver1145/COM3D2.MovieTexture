@@ -48,6 +48,31 @@ echo "Finished."
 pause>nul
 ```
 
+If you need to adjust the playback settings, create an xml with the same name at the video location (`{filename}.xml` for `{filename}.mp4` or `{filename}.alphapack.xml` for `{filename}.alphapack.mp4`).
+The example settings (each node is optional):
+```xml
+<MediaConfig>
+    <Loop>True</Loop>
+    <Muted>False</Muted>
+    <Volume>1.0</Volume>
+    <PlaybackRate>1.0</PlaybackRate>
+    <WrapMode>Repeat</WrapMode>
+    <FilterMode>Bilinear</FilterMode>
+    <AnisoLevel>1</AnisoLevel>
+</MediaConfig>
+```
+Option description:
+
+Loop:           [bool]
+Muted:          [bool]
+Volume:         [float(0 ~ 1)]
+PlaybackRate:   [float(-4 ~ 4)]
+WrapMode:       [Repeat|Clamp]
+FilterMode:     [Point|Bilinear|Trilinear]
+AnisoLevel:     [int(0 ~ 16)]
+
+**Note**:
+
 * You can add a video as RenderTexture to any Texture Slot. This means that some special dynamic effects can be achieved, such as replacing `_MatcapMap` map to implement transition transformations in different MatCaps, or replacing `_NormalMap`/`_ParallaxShaderToggle` map to achieve normal/parallax animation.
 * If `COM3D2.MaidLoader` is installed, the refresh function of MaidLoader will reload all *.mp4
 * Use [dcm_sync_anm](https://github.com/silver1145/scripts-com3d2#dcm_sync_anm) to sync video with `COM3D2.DanceCameraMotion.Plugin`.
