@@ -208,7 +208,7 @@ namespace COM3D2.MovieTexture.Plugin
 
     internal class TryPatchNPRShader : TryPatch
     {
-        public TryPatchNPRShader(Harmony harmony, int failLimit = 1) : base(harmony, failLimit) { }
+        public TryPatchNPRShader(Harmony harmony, int failLimit = 2) : base(harmony, failLimit) { }
 
         public override bool Patch()
         {
@@ -255,7 +255,7 @@ namespace COM3D2.MovieTexture.Plugin
 
     internal class TryPatchSceneCapture : TryPatch
     {
-        public TryPatchSceneCapture(Harmony harmony, int failLimit = 1) : base(harmony, failLimit) { }
+        public TryPatchSceneCapture(Harmony harmony, int failLimit = 2) : base(harmony, failLimit) { }
 
         public override bool Patch()
         {
@@ -300,7 +300,7 @@ namespace COM3D2.MovieTexture.Plugin
         public static AssetBundle asset;
         public static Shader shader;
 
-        public TryPatchDanceCameraMotion(Harmony harmony, int failLimit = 1) : base(harmony, failLimit) { }
+        public TryPatchDanceCameraMotion(Harmony harmony, int failLimit = 2) : base(harmony, failLimit) { }
 
         public override bool Patch()
         {
