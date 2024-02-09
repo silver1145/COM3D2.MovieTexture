@@ -404,7 +404,7 @@ namespace COM3D2.MovieTexture.Plugin
 
         public static void DestroyResolver(ScreenOverlay screenOverlay)
         {
-            if (screenOverlayResolvers.TryGetValue(screenOverlay, out var resolver))
+            if (screenOverlayResolvers != null && screenOverlayResolvers.TryGetValue(screenOverlay, out var resolver))
             {
                 Object.Destroy(resolver);
                 screenOverlayResolvers.Remove(screenOverlay);
@@ -417,7 +417,7 @@ namespace COM3D2.MovieTexture.Plugin
             return screenOverlayResolvers != null && screenOverlayResolvers.ContainsKey(screenOverlay);
         }
 
-        public static void ProcessRenderer2(SpriteRenderer renderer, Texture texture, string fileName, bool isBilinear)
+        public static void ProcessRenderer(SpriteRenderer renderer, Texture texture, string fileName, bool isBilinear)
         {
             if (screenOverlayResolvers == null)
             {
@@ -507,7 +507,7 @@ namespace COM3D2.MovieTexture.Plugin
                 .InsertAndAdvance(new CodeInstruction(OpCodes.Ldloc_S, 3))
                 .InsertAndAdvance(new CodeInstruction(OpCodes.Ldarga_S, 2))
                 .InsertAndAdvance(new CodeInstruction(OpCodes.Ldfld, AccessTools.Field(AccessTools.TypeByName("COM3D2.DanceCameraMotion.Plugin.SpriteSet"), "isBilinear")))
-                .InsertAndAdvance(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(ProcessRenderer2))));
+                .InsertAndAdvance(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TryPatchDanceCameraMotion), nameof(ProcessRenderer))));
             return codeMatcher.InstructionEnumeration();
         }
 
