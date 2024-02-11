@@ -15,6 +15,7 @@ namespace RenderHeads.Media.AVProVideo
         private Material _materialResolve;
         private bool _isMaterialSetup;
         private bool _isMaterialDirty;
+        private bool _lastSeeking;
         private RenderTexture _internalTexture;
         private int _textureFrameCount = -1;
         public event OnDestroyDelegate OnDestroyEvnt;
@@ -99,8 +100,18 @@ namespace RenderHeads.Media.AVProVideo
                 if (textureFrameCount != _textureFrameCount)
                 {
                     _internalTexture = VideoRender.ResolveVideoToRenderTexture(_materialResolve, _internalTexture, textureProducer, _resolveFlags, alphaPacking: _mediaPlayer.m_AlphaPacking, stereoPacking: _mediaPlayer.m_StereoPacking);
-                    _textureFrameCount = textureFrameCount;
-
+                    if (_textureFrameCount < -1)
+                    {
+                        if (_textureFrameCount++ % 10 != 0)
+                        {
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        _textureFrameCount = textureFrameCount;
+                    }
+                    
                     if (_internalTexture && _externalTexture)
                     {
                         // NOTE: This blit can be removed once we can ResolveVideoToRenderTexture is made not to recreate textures
@@ -109,6 +120,11 @@ namespace RenderHeads.Media.AVProVideo
                     }
                 }
             }
+        }
+
+        public void NeedRefresh(int next = 1)
+        {
+            _textureFrameCount = -10 * next;
         }
 
         void OnDisable()

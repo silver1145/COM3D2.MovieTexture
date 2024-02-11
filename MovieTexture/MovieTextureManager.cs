@@ -5,10 +5,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Threading;
 using System.Xml;
 using UnityEngine;
-using static OVRLipSync;
 
 namespace COM3D2.MovieTexture.Plugin
 {
@@ -52,7 +50,7 @@ namespace COM3D2.MovieTexture.Plugin
             platformOptionsWindows.useHardwareDecoding = GameMain.Instance.CMSystem.SConfig.VideoUseHardwareDecoding;
         }
 
-        public static void TryReadMediaConfig(MediaPlayer mediaPlayer, string configFileName)
+        public static void TryLoadMediaConfig(MediaPlayer mediaPlayer, string configFileName)
         {
 
             bool loop = true;
@@ -106,7 +104,7 @@ namespace COM3D2.MovieTexture.Plugin
                 return player;
             }
             var mPlayer = mediaPlayerManager.AddComponent<MediaPlayer>();
-            TryReadMediaConfig(mPlayer, Path.ChangeExtension(filename, ".xml"));
+            TryLoadMediaConfig(mPlayer, Path.ChangeExtension(filename, ".xml"));
             MediaPlayer.OptionsWindows platformOptionsWindows = mPlayer.PlatformOptionsWindows;
             SetPlatformOptions(platformOptionsWindows);
             if (filename.ToLower().EndsWith(".alphapack.mp4"))
@@ -114,6 +112,7 @@ namespace COM3D2.MovieTexture.Plugin
                 mPlayer.m_AlphaPacking = AlphaPacking.TopBottom;
             }
             mPlayer.OpenVideoFromFile(MediaPlayer.FileLocation.AbsolutePathOrURL, filename, true);
+            mPlayer.Events.AddListener((MediaPlayer mp, MediaPlayerEvent.EventType eventType, ErrorCode code) => NeedRefreshAfterSeek(filename, mp, eventType, code));
             mediaPlayers[filename] = mPlayer;
             return mPlayer;
         }
@@ -139,6 +138,20 @@ namespace COM3D2.MovieTexture.Plugin
             }
             resolvers[filename].Add(resolveToTexture);
             return resolveToTexture;
+        }
+
+        public static void NeedRefreshAfterSeek(string filename, MediaPlayer mp, MediaPlayerEvent.EventType eventType, ErrorCode code)
+        {
+            if (mp.Control.IsPaused() && eventType == MediaPlayerEvent.EventType.FinishedSeeking)
+            {
+                if (resolvers.TryGetValue(filename, out var resolverList))
+                {
+                    foreach (var resolver in resolverList)
+                    {
+                        resolver.NeedRefresh(5);
+                    }
+                }
+            }
         }
 
         public static void CheckResolvers()
@@ -196,7 +209,48 @@ namespace COM3D2.MovieTexture.Plugin
         {
             foreach (var mplayer in mediaPlayers.Values)
             {
-                mplayer.Control.Seek(0);
+                mplayer.Control.Seek(mplayer.m_PlaybackRate >= 0 ? 0 : ((mplayer.Control as BaseMediaPlayer)?.GetDurationMs() ?? 0));
+                mplayer.Play();
+            }
+        }
+
+        public static void PlayMovie()
+        {
+            foreach (var mplayer in mediaPlayers.Values)
+            {
+                mplayer.Play();
+            }
+        }
+
+        public static void PauseMovie()
+        {
+            foreach (var mplayer in mediaPlayers.Values)
+            {
+                mplayer.Pause();
+            }
+        }
+
+        public static void SeekMovie(float time)
+        {
+            float timeMs = time * 1000;
+            foreach (var mplayer in mediaPlayers.Values)
+            {
+                float playTimeMs = timeMs * mplayer.m_PlaybackRate;
+                BaseMediaPlayer player = mplayer.Control as BaseMediaPlayer;
+                if (player != null)
+                {
+                    var durationMs = player.GetDurationMs();
+                    float targetMs;
+                    if (Math.Abs(playTimeMs) < durationMs || mplayer.m_Loop)
+                    {
+                        targetMs = playTimeMs >= 0 ? playTimeMs % durationMs : durationMs + playTimeMs % durationMs;
+                    }
+                    else
+                    {
+                        targetMs = durationMs;
+                    }
+                    player.Seek(targetMs);
+                }
             }
         }
 

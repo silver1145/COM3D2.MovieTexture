@@ -73,7 +73,7 @@ namespace COM3D2.MovieTexture.Plugin
                 string texName = value.name?.ToLower();
                 if (textureNames.TryGetValue(texName, out var path))
                 {
-                    if (renderTextures.TryGetValue(texName, out var tex))
+                    if (renderTextures.TryGetValue(texName, out var tex) && tex.width == value.width && tex.height == value.height)
                     {
                         value = tex;
                     }
@@ -345,9 +345,9 @@ namespace COM3D2.MovieTexture.Plugin
 
         public static RenderTexture GetRenderTexture(string fileName, Texture tex)
         {
-            if (dcmRenderTextures.TryGetValue(fileName, out RenderTexture renderTexture))
+            if (dcmRenderTextures.TryGetValue(fileName, out RenderTexture rTex) && rTex.width == tex.width && rTex.height == tex.height)
             {
-                return renderTexture;
+                return rTex;
             }
             RenderTexture tex2 = new RenderTexture(tex.width, tex.height, 24);
             tex2.name = tex.name;
