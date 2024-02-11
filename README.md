@@ -50,6 +50,7 @@ pause>nul
 
 If you need to adjust the playback settings, create an xml with the same name at the video location (`{filename}.xml` for `{filename}.mp4` or `{filename}.alphapack.xml` for `{filename}.alphapack.mp4`).
 The example settings (each node is optional):
+
 ```xml
 <MediaConfig>
     <Loop>True</Loop>
@@ -61,15 +62,16 @@ The example settings (each node is optional):
     <AnisoLevel>1</AnisoLevel>
 </MediaConfig>
 ```
+
 Option description:
 
-Loop:           [bool]
-Muted:          [bool]
-Volume:         [float(0 ~ 1)]
-PlaybackRate:   [float(-4 ~ 4)]
-WrapMode:       [Repeat|Clamp]
-FilterMode:     [Point|Bilinear|Trilinear]
-AnisoLevel:     [int(0 ~ 16)]
+1. Loop:           [bool]
+2. Muted:          [bool]
+3. Volume:         [float(0 ~ 1)]
+4. PlaybackRate:   [float(-4 ~ 4)]
+5. WrapMode:       [Repeat|Clamp]
+6. FilterMode:     [Point|Bilinear|Trilinear]
+7. AnisoLevel:     [int(0 ~ 16)]
 
 **Note**:
 
