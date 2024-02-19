@@ -409,7 +409,7 @@ namespace COM3D2.MovieTexture.Plugin
                 Object.Destroy(resolver);
                 screenOverlayResolvers.Remove(screenOverlay);
             }
-            screenOverlayFileNames.Remove(screenOverlay);
+            screenOverlayFileNames?.Remove(screenOverlay);
         }
 
         public static bool HasResolver(ScreenOverlay screenOverlay)
